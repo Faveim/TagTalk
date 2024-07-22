@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TagTalk</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://rawgit.com/schmich/instascan-builds/master/instascan.min.js"></script>
+</head>
+<body>
+    <div id="app">
+        <h1>TagTalk</h1>
+        <div v-if="!user">
+            <h2>Register</h2>
+            <input v-model="email" placeholder="Email">
+            <input v-model="password" type="password" placeholder="Password">
+            <button @click="register">Register</button>
+        </div>
+        <div v-else>
+            <h2>Welcome, {{ user.email }}</h2>
+            <button @click="addVehicle">Add Vehicle</button>
+            <h3>Scan QR Code</h3>
+            <video id="preview"></video>
+            <h3>Send Message</h3>
+            <input v-model="scannedQR" placeholder="Scanned QR Code">
+            <textarea v-model="messageContent" placeholder="Message"></textarea>
+            <button @click="sendMessage">Send Message</button>
+            <h3>Your Messages</h3>
+            <ul>
+                <li v-for="message in messages" :key="message[0]">
+                    {{ message[2] }} ({{ message[3] }})
+                </li>
+            </ul>
+        </div>
+    </div>
+    <script>
+        new Vue({
+            el: '#app',
+            data: {
+                user: null,
+                email: '',
+                password: '',
+                scannedQR: '',
+                messageContent: '',
+                messages: [],
+                apiUrl: 'https://script.google.com/macros/s/AKfycby6TvxgNAjVAMF_Vu5qTwjj_vZzQQFFS82i6hRoBnsDXMdyF6H8TEyqa0ZWtricfM_ahw/exec'
+            },
+            methods: {
+                register() {
+                    axios.get(`${this.apiUrl}?action=register&email=${this.email}&password=${this.password}`)
+                        .then(response => {
+                            this.user = { email: this.email, id: response.data.userId };
+                            this.getMessages();
+                        })
+                        .catch(error => console.error(error));
+                },
+                addVehicle() {
+                    axios.get(`${this.apiUrl}?action=addVehicle&userId=${this.user.id}`)
+                        .then(response => {
+                            alert(`New vehicle added with QR code: ${response.data.qrCode}`);
+                        })
+                        .catch(error => console.error(error));
+                },
+                sendMessage() {
+                    axios.get(`${this.apiUrl}?action=sendMessage&vehicleId=${this.scannedQR}&content=${this.messageContent}`)
+                        .then(response => {
+                            alert('Message sent successfully');
+                            this.scannedQR = '';
+                            this.messageContent = '';
+                        })
+                        .catch(error => console.error(error));
+                },
+                getMessages() {
+                    axios.get(`${this.apiUrl}?action=getMessages&userId=${this.user.id}`)
+                        .then(response => {
+                            this.messages = response.data;
+                        })
+                        .catch(error => console.error(error));
+                },
+                setupQRScanner() {
+                    let scanner = new Instascan.Scanner({ video: document.getElementById('preview') });
+                    scanner.addListener('scan', content => {
+                        this.scannedQR = content;
+                    });
+                    Instascan.Camera.getCameras().then(cameras => {
+                        if (cameras.length > 0) {
+                            scanner.start(cameras[0]);
+                        } else {
+                            console.error('No cameras found.');
+                        }
+                    }).catch(error => console.error(error));
+                }
+            },
+            mounted() {
+                this.setupQRScanner();
+            }
+        });
+    </script>
+</body>
+</html>
